@@ -1,6 +1,13 @@
 #!/bin/sh
 # shellcheck shell=sh
 
+# SCRIPT STRUCTURE
+# * `# = UPPERCASE TITLE =`
+# * `## = Subsection =`
+#
+# run the following to view the script structure:
+# grep -E '# =|() {$' prompt.sh | grep -i --color '[A-Za-z0-9]'
+
 # STYLE GUIDE
 #    SPS_SCREAMING_SNAKE_CASE - user config environment variables (constants)
 #   _SPS_SCREAMING_SNAKE_CASE - (global) constants - do not change in a session
@@ -15,7 +22,7 @@ _SPS_main() {
 	_SPS_set_user
 	_SPS_set_sps_hostname
 	_SPS_set_sps_platform
-	_SPS_set_sps_tmp
+	_SPS_set_sps_tmp       # must be after _platform
 
 	# init script constants
 	_SPS_set_sps_colors
@@ -25,9 +32,10 @@ _SPS_main() {
 	_SPS_set_ps1
 }
 
-# init user config constants
 
-## SPS_ESCAPE
+# = INIT USER CONSTANTS =
+
+## = SPS_ESCAPE =
 
 # https://tldp.org/HOWTO/Bash-Prompt-HOWTO/nonprintingchars.html
 #		Zero-Width Escape Sequences allows the shell to correctly calculate the
@@ -46,9 +54,9 @@ _SPS_set_sps_escape() {
 }
 
 _SPS_is_ash_or_ksh() {
-	[ -f /proc/$$/exe ] || return 1
+	[ -f "/proc/$$/exe" ] || return 1
 
-	readlink /proc/$$/exe 2>/dev/null \
+	readlink "/proc/$$/exe" 2>/dev/null \
 		| grep -Eq '(^|/)(busybox|bb|ginit|.?ash|ksh.*)$'
 }
 
@@ -58,24 +66,24 @@ _SPS_is_windows() {
 	printf '%s' "$(uname -s 2>/dev/null)" | grep -qi 'windows'
 }
 
-# init system constants
+# = INIT SYSTEM CONSTANTS =
 
-## USER
+## = USER =
 
 _SPS_set_user() {
 	: "${USER:=$(whoami)}"
 }
 
-## _SPS_HOSTNAME
+## = _SPS_HOSTNAME =
 
 _SPS_set_sps_hostname() {
 	_SPS_HOSTNAME=$(hostname | sed -E 's/\..*//')
 }
 
-## _SPS_PLATFORM
+## = _SPS_PLATFORM =
 
 _SPS_set_sps_platform() {
-	# Use POSIX `uname -s` (operating system/kernel) which is supported on all platforms
+	# POSIX `uname -s` (operating system/kernel) is supported on all platforms
 	case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
 		cygwin*)  _SPS_PLATFORM='cygwin'  ;;
 		darwin)   _SPS_PLATFORM='macOS'   ;;
@@ -213,10 +221,10 @@ _SPS_get_platform_other() {
 	printf '%s' "$_sps_platform"
 }
 
-## _SPS_TMPDIR
+## = _SPS_TMPDIR =
 
 # create temp folder per shell session ($$)
-#   to pass messagess between PS1 functions
+#   to pass messages between PS1 functions
 #   as these functions are run in different subshells
 _SPS_set_sps_tmp() {
 	_SPS_TMPDIR="${XDG_RUNTIME_DIR:-${TMPDIR:-${TEMP:-${TMP:-/tmp}}}}/sh-prompt-simple/$$"
@@ -229,9 +237,9 @@ _SPS_set_sps_tmp() {
 	mkdir -p "$_SPS_TMPDIR"
 }
 
-# init script constants
+# = INIT SCRIPT CONSTANTS =
 
-## ANSI Escape Codes
+## = ANSI Escape Codes: _SPS_CSI, _SPS_SGR_* =
 
 _SPS_set_sps_colors() {
 	# ANSI Control Sequence Introducer
@@ -255,13 +263,13 @@ _SPS_set_sps_colors() {
 	_SPS_SGR_TD_BOLD="${_SPS_CSI}[1m"
 }
 
-## _SPS_PROMPT_CHAR
+## = _SPS_PROMPT_CHAR =
 
 _SPS_set_sps_prompt_char() {
 	[ "$(id -u)" = 0 ] && _SPS_PROMPT_CHAR='#' || _SPS_PROMPT_CHAR='>'
 }
 
-# do action
+# = DO ACTION =
 
 _SPS_set_ps1() {
 	if [ "$SPS_ESCAPE" = 1 ]; then
@@ -274,10 +282,10 @@ _SPS_set_ps1() {
 	fi
 }
 
-## Shells that DO support the zero-width escape sequence (`\[...\]`)
+## = Shells that DO support the zero-width escape sequence (`\[...\]`) =
 
 # TODO: Why are these using backticks '`...`' for command substitution?
-# TODO:  Is it to support old shels that do not support '$(...)'?
+# TODO:  Is it to support old shells that do not support '$(...)'?
 _SPS_set_ps1_with_zw_escape() {
 	PS1="\
 "'`_SPS_save_last_exit_status`'"\
@@ -302,7 +310,7 @@ _SPS_set_ps1_with_zw_escape() {
  "
 }
 
-## Shells that DO NOT support the zero-width escape sequence (`\[...\]`)
+## = Shells that DO NOT support the zero-width escape sequence (`\[...\]`) =
 
 # TODO: Why are these using backticks '`...`' for command substitution?
 # TODO:  Is it to support old shells that do not support '$(...)'?
@@ -330,7 +338,7 @@ ${_SPS_SGR_TD_NORMAL}\
  "
 }
 
-# Last Command Exit Status
+## = Last Command Exit Status =
 
 # Save status to file as run in a subshell, so cannot pass to other functions
 _SPS_save_last_exit_status() {
@@ -361,7 +369,7 @@ _SPS_last_exit_status_symbol() {
 	fi
 }
 
-## SPS_WINDOW_TITLE
+## = SPS_WINDOW_TITLE =
 
 _SPS_set_window_title() {
 	[ "$SPS_WINDOW_TITLE" = 0 ] && return 0
@@ -386,15 +394,13 @@ _SPS_get_domain_or_localnet_host() {
 	'
 }
 
-## Current Working Directory
+## = Current Working Directory =
 
 _SPS_pwd() {
 	case "$PWD" in
-		"$HOME")
-			printf '%s' '~'
-			;;
+		"$HOME") printf '%s' '~' ;;
 		"$HOME"/*)
-			local pwd=${PWD#$HOME}
+			_sps_pwd="${PWD#"$HOME"}"
 
 			# TODO: this assumes that there are multiple leading '/',
 			#   otherwise this 'while' block is redundant,
@@ -403,19 +409,21 @@ _SPS_pwd() {
 			#   However, why would $PWD have multiple '/' after $HOME?
 			# strip leading `/`
 			while :; do
-				case "$pwd" in
-					/*) pwd=${pwd#/} ;;
-					*)  break        ;;
+				case "$_sps_pwd" in
+					/*) _sps_pwd=${_sps_pwd#/} ;;
+					*)  break                  ;;
 				esac
 			done
 
-			printf '%s' "~/${pwd}"
+			# We need a literal `~`, not $HOME expansion.
+			# shellcheck disable=2088
+			printf '%s' "~/${_sps_pwd}"
 			;;
 		*) printf '%s' "${PWD}" ;;
 	esac
 }
 
-## Git
+## = Git =
 
 # only print if in git repo
 _SPS_git_open_bracket() {
@@ -534,7 +542,7 @@ _SPS_git_close_bracket() {
 	_SPS_is_git_repo && printf ']'
 }
 
-# Cleanup on exit
+# = CLEANUP ON EXIT =
 
 # called by `trap` when shell session is exited
 _SPS_cleanup() {
@@ -544,6 +552,6 @@ _SPS_cleanup() {
 # trap when shell session is exited
 trap "_SPS_cleanup" EXIT
 
-# Main
+# = MAIN =
 
 _SPS_main
