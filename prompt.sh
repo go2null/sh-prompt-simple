@@ -55,7 +55,7 @@ _SPS_is_ash_or_ksh() {
 _SPS_is_windows() {
 	[ -d '/Windows/System32' ] && return 0
 
-	printf '%s' "$(uname 2>/dev/null)" | grep -qi 'windows'
+	printf '%s' "$(uname -s 2>/dev/null)" | grep -qi 'windows'
 }
 
 # init system constants
@@ -75,38 +75,70 @@ _SPS_set_sps_hostname() {
 ## _SPS_PLATFORM
 
 _SPS_set_sps_platform() {
-	case "$(uname -o )" in
-		Cygwin) _SPS_PLATFORM='cygwin'  ;;
-		Darwin) _SPS_PLATFORM='macOS'   ;;
-		Msys)
-			if [ -n "$MSYSTEM" ]; then
-				_SPS_PLATFORM="msys:$(printf '%s' "$MSYSTEM" | tr '[:upper:]' '[:lower:]')"
-			else
-				_SPS_PLATFORM='msys'
-			fi
-			;;
-		*Linux)
-			_SPS_PLATFORM="$(_SPS_get_linux_platform)"
-			: "${_SPS_PLATFORM:=linux}"
-			;;
-		*)
-			_SPS_PLATFORM="$(_SPS_get_non_linux_platform)"
-			: "${_SPS_PLATFORM:=UNKNOWN}"
-			;;
+	# Use POSIX `uname -s` (operating system/kernel) which is supported on all platforms
+	case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
+		cygwin*)  _SPS_PLATFORM='cygwin'  ;;
+		darwin)   _SPS_PLATFORM='macOS'   ;;
+		linux)    _SPS_PLATFORM="$(_SPS_get_platform_linux)" ;;
+		mingw*)   _SPS_PLATFORM="$(_SPS_get_platform_msys)"  ;;
+		msys*)    _SPS_PLATFORM="$(_SPS_get_platform_msys)"  ;;
+		windows*) _SPS_PLATFORM='windows' ;;
+		*)        _SPS_PLATFORM="$(_SPS_get_platform_other)" ;;
 	esac
 }
 
-_SPS_uname_o() {
-	# macOS does not have `uname -o`.
-	uname -o 2>/dev/null || uname
+_SPS_get_platform_msys() {
+	if [ -n "$MSYSTEM" ] && [ "$MSYSTEM" != 'MSYS' ]; then
+		_sps_platform="msys:$(printf '%s' "$MSYSTEM" | tr '[:upper:]' '[:lower:]')"
+	fi
+
+	: "${_sps_platform:=msys}"
+	printf '%s' "$_sps_platform"
 }
 
-_SPS_get_linux_platform() {
-	[ -f '/etc/os-release' ] || return 0
+_SPS_get_platform_linux() {
+	if [ -f '/etc/os-release' ]; then
+		_sps_platform="$(_SPS_get_platform_linux_os_release_id)"
+		_sps_platform="$(_SPS_get_platform_linux_parse_id "$_sps_platform")"
 
-	_sps_linux_release="$(sed -nE '/^ID="/s/^ID="([^"]+)".*/\1/p; s/^ID=([^[:space:]]+)/\1/p; t match; d; :match; q' '/etc/os-release')"
+		# If normalized name is longer than 15 characters, abbreviate instead.
+		if [ "$(printf '%s' "$_sps_platform" | wc -c)" -gt 15 ]; then
+			_sps_platform="$(_SPS_get_platform_linux_shorten  "$_sps_platform")"
+		fi
+	fi
 
-	_sps_linux_platform="$(printf '%s' "$_sps_linux_release" | sed -E '
+	: "${_sps_platform:=linux}"
+	printf '%s' "$_sps_platform"
+}
+
+_SPS_get_platform_linux_os_release_id() {
+	sed -nE '
+		# extract double-quoted ID
+
+		/^ID="/s/^ID="([^"]+)".*/\1/p
+
+		# extract any ID
+
+		s/^ID=([^[:space:]]+)/\1/p
+
+		# goto match if no matches found above
+
+		t match
+
+		# delete the current pattern space and skip to next line of input
+
+		d
+
+		# do not read more lines of input, quit sed
+
+		:match
+		q' \
+	'/etc/os-release'
+}
+
+_SPS_get_platform_linux_parse_id() {
+	# shellcheck disable=SC2016
+	printf '%s' "$*" | sed -E '
 		# Remove all buzzwords and extraneous words.
 
 		s/(GNU|Secure|open)//ig
@@ -115,8 +147,8 @@ _SPS_get_linux_platform() {
 		s/(^|[[:space:][:punct:]]+)(LTS|toolkit|operating|solutions|Security|Firewall|Cluster|Distribution|system|project|interim|enterprise|corporate|server|desktop|studio|edition|live|libre|industrial|incognito|remix|and|on|a|for|the|[0-9]+)($|[[:space:][:punct:]]+)/\1\3/i
 		t buzzwords
 
-		# Remove GNU or Linux not at the beginning of phrase, or X
-		# as a word by itself not at the beginning of phrase.
+		# Remove GNU or Linux   not at the beginning of phrase, or
+		# X as a word by itself not at the beginning of phrase.
 
 		:gnulinux
 		s,([[:space:][:punct:]]+)(GNU|Linux|X([[:space:][:punct:]]|$)),\1,i
@@ -127,7 +159,9 @@ _SPS_get_linux_platform() {
 		s/[[:space:][:punct:]]+$//
 		s/^[[:space:][:punct:]]+//
 
-		# Normalize all suse products to suse.
+		# Normalize all SUSE products to `suse`.
+		# TODO: The `t` alone means terminate the sed substitions if `SUSE` is
+		# 	replaced. Why?
 
 		s/.*(^|[[:space:][:punct:]])SUSE($|[[:space:][:punct:]]).*/suse/i
 		t
@@ -142,34 +176,41 @@ _SPS_get_linux_platform() {
 		s/[[:space:]]+/_/g
 
 		# Keep names with one hyphen, replace all other punctuation
-		# sequnces with underscore.
+		# sequences with underscore.
 
 		/^[^-]+-[^-]+$/!{
 			s/[[:punct:]]+/_/g
 		}
-	')";
 
-	# If normalized name is longer than 15 characters, abbreviate instead.
-	if [ "$(printf '%s' "$_sps_linux_platform" | wc -c)" -gt 15 ]; then
-		_sps_linux_platform="$(printf '%s' "$_sps_linux_release" | sed -E '
-			:abbrev
-			s/(^|[[:space:][:punct:]]+)([[:alpha:]])[[:alpha:]]+/\1\2/
-			t abbrev
-			s/[[:space:][:punct:]]+//g
-		')"
-	fi
-
-	printf '%s' "$_sps_linux_platform"
+		# TODO: Should we check for sequences of `_` and replace with a single 1?
+	'
 }
 
-_SPS_get_non_linux_platform() {
+_SPS_get_platform_linux_shorten() {
+	printf '%s' "$*" | sed -E '
+		# Take only the first letter of each word
+
+		:abbrev
+		s/(^|[[:space:][:punct:]]+)([[:alpha:]])[[:alpha:]]+/\1\2/
+		t abbrev
+
+		# Remove spaces and punctuations
+
+		s/[[:space:][:punct:]]+//g
+	'
+}
+
+_SPS_get_platform_other() {
 	if [ -n "$TERMUX_VERSION" ]; then
-		printf '%s' 'termux'
+		_sps_platform='termux'
 	elif _SPS_is_windows; then
-		printf '%s' 'windows'
+		_sps_platform='windows'
 	else
-		uname | sed -E 's/[[:space:][:punct:]]+/_/g'
+		_sps_platform="$(uname -s | sed -E 's/[[:space:][:punct:]]+/_/g')"
 	fi
+
+	: "${_sps_platform:=UNKNOWN}"
+	printf '%s' "$_sps_platform"
 }
 
 ## _SPS_TMPDIR
@@ -229,7 +270,7 @@ _SPS_set_ps1() {
 		# ZSH does not support Zero-Width Escapes
 		[ -n "$ZSH_VERSION" ] && setopt PROMPT_SUBST
 
-		_SPS_set_ps1_without_zw_escape 
+		_SPS_set_ps1_without_zw_escape
 	fi
 }
 
@@ -363,20 +404,14 @@ _SPS_pwd() {
 			# strip leading `/`
 			while :; do
 				case "$pwd" in
-					/*)
-						pwd=${pwd#/}
-						;;
-					*)
-						break
-						;;
+					/*) pwd=${pwd#/} ;;
+					*)  break        ;;
 				esac
 			done
 
 			printf '%s' "~/${pwd}"
 			;;
-		*)
-			printf '%s' "${PWD}"
-			;;
+		*) printf '%s' "${PWD}" ;;
 	esac
 }
 
