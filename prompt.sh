@@ -56,14 +56,23 @@ _SPS_set_sps_escape() {
 _SPS_is_ash_or_ksh() {
 	[ -f "/proc/$$/exe" ] || return 1
 
-	readlink "/proc/$$/exe" 2>/dev/null \
+	if readlink "/proc/$$/exe" 2>/dev/null \
 		| grep -Eq '(^|/)(busybox|bb|ginit|.?ash|ksh.*)$'
+	then
+		return 0
+	else
+		return 1
+	fi
 }
 
 _SPS_is_windows() {
 	[ -d '/Windows/System32' ] && return 0
 
-	printf '%s' "$(uname -s 2>/dev/null)" | grep -qi 'windows'
+	if printf '%s' "$(uname -s 2>/dev/null)" | grep -qi 'windows'; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 # = INIT SYSTEM CONSTANTS =
@@ -436,7 +445,7 @@ _SPS_git_open_bracket() {
 #   1st line has branch info in format
 #     '## LOCAL_BRANCH
 #     '## LOCAL_BRANCH...REMOTE/REMOTE_BRANCH
-#     '## LOCAL_BRANCH...REMOTE/REMOTE_BRANCH [ahead N, behind Y]
+#     '## LOCAL_BRANCH...REMOTE/REMOTE_BRANCH [ahead N, behind M]
 #   2nd line onwards have change info, one line per file, if any changes.
 # IF is bare repo or in .git directory
 #   [git 2.49.0 on MSYS2, git 2.49.0 on Linux]
