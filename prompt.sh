@@ -437,71 +437,82 @@ _SPS_pwd() {
 # only print if in git repo
 _SPS_git_open_bracket() {
 	_SPS_save_git_status
+
 	_SPS_is_git_repo && printf ' ['
 }
 
 # `git status --branch --porcelain`
-# IF is in work tree
+# IF is in a work tree
 #   1st line has branch info in format
-#     '## LOCAL_BRANCH
-#     '## LOCAL_BRANCH...REMOTE/REMOTE_BRANCH
-#     '## LOCAL_BRANCH...REMOTE/REMOTE_BRANCH [ahead N, behind M]
+#     '## LOCAL_BRANCH'
+#     '## LOCAL_BRANCH...REMOTE/REMOTE_BRANCH'
+#     '## LOCAL_BRANCH...REMOTE/REMOTE_BRANCH [ahead N, behind M]'
 #   2nd line onwards have change info, one line per file, if any changes.
-# IF is bare repo or in .git directory
+# IF is in a bare repo or in a .git directory
 #   [git 2.49.0 on MSYS2, git 2.49.0 on Linux]
-#     fatal: this operation must be run in a work tree
+#     'fatal: this operation must be run in a work tree'
 # IF is not a git repo
 #   [git 2.49.0 on MSYS2]
-#     fatal: not a git repository (or any of the parent directories): .git
+#     'fatal: not a git repository (or any of the parent directories): .git'
 #   [git 2.49.0 on Linux]
-#     fatal: not a git repository (or any parent up to mount point /)
-#     Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set
+#     'fatal: not a git repository (or any parent up to mount point /)'
+#     'Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set'
 #
 _SPS_save_git_status() {
-	if _sps_local="$(LANG=C LC_ALL=C git status --branch --porcelain 2>&1)"; then
+	if _sps_git_status_output="$(LANG=C LC_ALL=C git status --branch --porcelain 2>&1)"; then
 		# IF   `git status` does not error out
 		# THEN PWD is in a git work tree
 
-		if [ "$(printf '%s\n' "$_sps_local" | wc -l)" -eq 1 ]; then
-			# IF   the output is only 1 line
-			# THEN the work tree is clean
+		_SPS_write_git_branch "$(_SPS_get_git_branch_from_status)"
+		_SPS_write_git_clean  "$(_SPS_git_branch_matches_upstream)"
+	elif _SPS_string_includes "$_sps_git_status_output" 'work tree'; then
+		# IF   STDERR message contains 'work tree'
+		# THEN PWD is in the .git directory tree or in a bare repo
 
-			if [ "${_sps_local#\[*}" != "$_sps_local" ]; then
-				# IF   the output (first line) includes a '['
-				# THEN the local branch is ahead or behind the upstream
-				rm -f "$_SPS_TMPDIR/git_clean"
-			else
-				# ELSE the local branch is either in sync with the upsteam, or has no upstream
-				touch "$_SPS_TMPDIR/git_clean"
-			fi
-		else
-			# ELSE the work tree is dirty
-			# AND the local branch matches the remote branch (if any)
-			rm -f "$_SPS_TMPDIR/git_clean"
-		fi
+		_SPS_write_git_branch "$(_SPS_get_git_branch_from_branch)"
+		_SPS_write_git_clean  'Y'
+	else # PWD is not in a git repo
+		_SPS_write_git_branch '' # git_branch presence indicates PWD is a git repo
+	fi
+}
 
-		# get branch name
+_SPS_write_git_branch() {
+	if [ -n "$1" ]; then
+		printf '%s' "$*" > "$_SPS_TMPDIR/git_branch"
+	else
+		rm -rf "$_SPS_TMPDIR/git_branch"
+	fi
+}
+
+_SPS_write_git_clean() {
+	if [ -n "$1" ]; then
+		touch "$_SPS_TMPDIR/git_clean"
+	else
+		rm -f "$_SPS_TMPDIR/git_clean"
+	fi
+}
+
+_SPS_get_git_branch_from_status() {
+		_sps_local="$_sps_git_status_output"
 		_sps_local="${_sps_local#* }"    # strip leading '## '
 		_sps_local="${_sps_local%%...*}" # strip from (first) '...' onwards
-		printf '%s' "$_sps_local" > "$_SPS_TMPDIR/git_branch"
-	else
-		# ELSE PWD is in the .git tree or in a bare repo or not in a git repo
+		printf '%s' "$_sps_local"
+}
 
-		if [ "${_sps_local%work tree*}" != "$_sps_local" ]; then
-			# IF   STDERR message contains 'work tree'
-			# THEN PWD is in the .git tree or in a bare repo
-			touch "$_SPS_TMPDIR/git_clean"
+_SPS_get_git_branch_from_branch() {
+		_sps_local="$(git branch)"
+		_sps_local="${_sps_local#*\* }"  # strip to '* '
+		_sps_local="${_sps_local%% *}"   # strip from first remaining space onwards
+		printf '%s' "$_sps_local"
+}
 
-			# get branch name
-			_sps_local="$(git branch)"
-			_sps_local="${_sps_local#*\* }"
-			_sps_local="${_sps_local%% *}"
-			printf '%s' "$_sps_local" > "$_SPS_TMPDIR/git_branch"
-		else
-			# ELSE PWD is not in a git repo
-			rm -f "$_SPS_TMPDIR/git_branch"
-		fi
-	fi
+# IF   the `git status --branch --porcelain` output is only 1 line
+# AND  it does not contain a '['
+# THEN the work tree matches upstream
+_SPS_git_branch_matches_upstream() {
+	[ "$(printf '%s\n' "$_sps_git_status_output" | wc -l)" -gt 1 ] && return 1
+	_SPS_string_includes "$_sps_git_status_output" '['             && return 1
+	printf '%s' 'Y'
 }
 
 _SPS_is_git_repo() {
@@ -560,6 +571,15 @@ _SPS_cleanup() {
 
 # trap when shell session is exited
 trap "_SPS_cleanup" EXIT
+
+
+# = FUNCTIONS =
+
+# $1 - self, string to search within
+# $2 - string to search for
+# RETURN - Exit Code 0 for TRUE, non-0 for FALSE
+_SPS_string_includes() { [ "${1#*"$2"}" = "$1" ] && return 1 || return 0; }
+
 
 # = MAIN =
 
