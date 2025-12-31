@@ -351,30 +351,32 @@ ${_SPS_SGR_TD_NORMAL}\
 
 # Save status to file as run in a subshell, so cannot pass to other functions
 _SPS_save_last_exit_status() {
-	if [ "$?" -eq 0 ]; then
-		touch "$_SPS_TMPDIR/last_exit_status_0"
-	else
-		rm -f "$_SPS_TMPDIR/last_exit_status_0"
-	fi
+	printf '%s' "$?" > "$_SPS_TMPDIR/last_exit_status"
 }
 
 # TODO: why are color and symbol separate functions?
 #   is it to support the shells not supporting zero-width escape sequences?
 _SPS_last_exit_status_color() {
-	if [ -f "$_SPS_TMPDIR/last_exit_status_0" ]; then
+	if [ "$(_SPS_get_last_exit_status)" -eq 0 ]; then
 		printf '%b' "$_SPS_SGR_FG_GREEN"
 	else
 		printf '%b' "$_SPS_SGR_FG_RED"
 	fi
 }
 
+_SPS_get_last_exit_status() {
+	head -n 1 "$_SPS_TMPDIR/last_exit_status"
+}
+
 # TODO: why are color and symbol separate functions?
 #   is it to support the shells not supporting zero-width escape sequences?
 _SPS_last_exit_status_symbol() {
-	if [ -f "$_SPS_TMPDIR/last_exit_status_0" ]; then
-		printf 'v'
+	if [ "$SPS_EXIT_STATUS" = 'actual' ]; then
+		_SPS_get_last_exit_status
+	elif [ "$(_SPS_get_last_exit_status)" = '0' ]; then
+		printf '%s' 'v'
 	else
-		printf 'x'
+		printf '%s' 'x'
 	fi
 }
 
@@ -531,9 +533,6 @@ _SPS_git_sep() {
 
 	printf '|'
 }
-
-# TODO: why are color and symbol separate functions?
-#   is it to support the shells not supporting zero-width escape sequences?
 _SPS_git_status_color() {
 	[ "$SPS_STATUS" = '1' ] || return 0
 	_SPS_is_git_repo        || return 0
