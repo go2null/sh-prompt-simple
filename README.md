@@ -19,10 +19,13 @@ window](/screenshots/sh-prompt-simple-demo.png?raw=true)
 This is a simple, lightweight, and nice looking prompt that runs quickly
 even in very slow shells like MSYS2, Cygwin and WSL.
 
-It shows the short name of the current environment (distribution, OS, etc.,) the
-git branch when in a git checkout, the last command exit status (green checkmark
-for success and red X mark for non-zero exit) and an optional clean/dirty git
-status indicator.
+It shows the short name of the current environment (distribution, OS, etc.),
+the last command exit status in addition to the username and hostname.
+
+If it finds `__git_ps1` from [git-prompt.sh](https://github.com/git/git/blob/master/contrib/completion/git-prompt.sh),
+then it will use that to display the git status.  Othwerwise, it will show
+the git branch when in a git checkout, and an optional clean/dirty git status
+indicator.
 
 This prompt is compatible with bash, zsh and some other POSIX sh
 implementations such as busybox, (d)ash, ksh, etc..

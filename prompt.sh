@@ -282,12 +282,20 @@ _SPS_set_sps_prompt_char() {
 
 _SPS_set_ps1() {
 	if [ "$SPS_ESCAPE" = 1 ]; then
-		_SPS_set_ps1_with_zw_escape
+		if command -v '__git_ps1' >/dev/null; then
+			_SPS_set_ps1_with_zw_escape_with_git_prompt
+		else
+			_SPS_set_ps1_with_zw_escape
+		fi
 	else
 		# ZSH does not support Zero-Width Escapes
 		[ -n "$ZSH_VERSION" ] && setopt PROMPT_SUBST
 
-		_SPS_set_ps1_without_zw_escape
+		if command -v '__git_ps1' >/dev/null; then
+			_SPS_set_ps1_without_zw_escape_with_git_prompt
+		else
+			_SPS_set_ps1_without_zw_escape
+		fi
 	fi
 }
 
@@ -319,6 +327,28 @@ _SPS_set_ps1_with_zw_escape() {
  "
 }
 
+# TODO: Why are these using backticks '`...`' for command substitution?
+# TODO:  Is it to support old shells that do not support '$(...)'?
+_SPS_set_ps1_with_zw_escape_with_git_prompt() {
+	PS1="\
+"'`_SPS_save_last_exit_status`'"\
+\["'`_SPS_set_window_title`'"\]\
+\["'`_SPS_last_exit_status_color`'"\]"'`_SPS_last_exit_status_symbol`'"\
+ \
+\[${_SPS_SGR_FG_BRIGHT_MAGENTA}\]${_SPS_PLATFORM}\
+ \
+\[${_SPS_SGR_FG_YELLOW}\]"'`_SPS_pwd`'"\
+\[${_SPS_SGR_TD_NORMAL}\]"'`__git_ps1 " (%s)"`'" \
+
+\[${_SPS_SGR_FG_8CCEFA}\]${USER}\
+\[${_SPS_SGR_TD_BOLD}${_SPS_SGR_FG_WHITE}\]@\
+\[${_SPS_SGR_FG_8CCEFA}\]${_SPS_HOSTNAME}\
+ \
+\[${_SPS_SGR_FG_C8143C}\]${_SPS_PROMPT_CHAR}\
+\[${_SPS_SGR_TD_NORMAL}\]\
+ "
+}
+
 ## = Shells that DO NOT support the zero-width escape sequence (`\[...\]`) =
 
 # TODO: Why are these using backticks '`...`' for command substitution?
@@ -337,6 +367,28 @@ ${_SPS_SGR_FG_MAGENTA}"'`_SPS_git_branch`'"\
 ${_SPS_SGR_FG_WHITE}"'`_SPS_git_sep`'"\
 "'`_SPS_git_status_color``_SPS_git_status_symbol`'"\
 ${_SPS_SGR_FG_CYAN}"'`_SPS_git_close_bracket`'"\
+
+${_SPS_SGR_FG_8CCEFA}${USER}\
+${_SPS_SGR_TD_BOLD}${_SPS_SGR_FG_WHITE}@\
+${_SPS_SGR_FG_8CCEFA}${_SPS_HOSTNAME}\
+ \
+${_SPS_SGR_FG_C8143C}${_SPS_PROMPT_CHAR}\
+${_SPS_SGR_TD_NORMAL}\
+ "
+}
+
+# TODO: Why are these using backticks '`...`' for command substitution?
+# TODO:  Is it to support old shells that do not support '$(...)'?
+_SPS_set_ps1_without_zw_escape_with_git_prompt() {
+	PS1="\
+"'`_SPS_save_last_exit_status`'"\
+"'`_SPS_set_window_title`'"\
+"'`_SPS_last_exit_status_color``_SPS_last_exit_status_symbol`'"\
+ \
+${_SPS_SGR_FG_BRIGHT_MAGENTA}${_SPS_PLATFORM}\
+ \
+${_SPS_SGR_FG_YELLOW}"'`_SPS_pwd`'"\
+${_SPS_SGR_TD_NORMAL}"'`__git_ps1 " (%s)"`'"\
 
 ${_SPS_SGR_FG_8CCEFA}${USER}\
 ${_SPS_SGR_TD_BOLD}${_SPS_SGR_FG_WHITE}@\
