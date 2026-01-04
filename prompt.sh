@@ -1,12 +1,13 @@
 #!/bin/sh
 # shellcheck shell=sh
 
+
 # SCRIPT STRUCTURE
 # * `# = UPPERCASE TITLE =`
 # * `## = Subsection =`
 #
 # run the following to view the script structure:
-# grep -E '# =|() {$' prompt.sh | grep -i --color '[A-Za-z0-9]'
+#   grep -E '# =|() {$' prompt.sh | grep -i --color '[A-Za-z0-9]'
 
 # STYLE GUIDE
 #    SPS_SCREAMING_SNAKE_CASE - user config environment variables (constants)
@@ -45,12 +46,12 @@ _SPS_main() {
 #			the control characters like color codes and dynamic functions.
 
 _SPS_set_sps_escape() {
-	[ -n "$SPS_ESCAPE"   ] && return 0 # respect user setting
+	[ -n "${SPS_ESCAPE:-}"   ] && return 0 # respect user setting
 
-	[ -n "$BASH_VERSION" ] && SPS_ESCAPE=1 && return 0
-	[ -n "$ZSH_VERSION"  ] && SPS_ESCAPE=0 && return 0 # ZSH deos not support Zero-Width Escaping
-	_SPS_is_ash_or_ksh     && SPS_ESCAPE=1 && return 0
-	_SPS_is_windows        && SPS_ESCAPE=1 && return 0 # Possibly a busybox for Windows build.
+	[ -n "${BASH_VERSION:-}" ] && SPS_ESCAPE=1 && return 0
+	[ -n "${ZSH_VERSION:-}"  ] && SPS_ESCAPE=0 && return 0 # ZSH deos not support Zero-Width Escaping
+	_SPS_is_ash_or_ksh         && SPS_ESCAPE=1 && return 0
+	_SPS_is_windows            && SPS_ESCAPE=1 && return 0 # Possibly a busybox for Windows build.
 }
 
 _SPS_is_ash_or_ksh() {
@@ -105,7 +106,7 @@ _SPS_set_sps_platform() {
 }
 
 _SPS_get_platform_msys() {
-	if [ -n "$MSYSTEM" ] && [ "$MSYSTEM" != 'MSYS' ]; then
+	if [ -n "${MSYSTEM:-}" ] && [ "$MSYSTEM" != 'MSYS' ]; then
 		_sps_platform="msys:$(printf '%s' "$MSYSTEM" | tr '[:upper:]' '[:lower:]')"
 	fi
 
@@ -218,7 +219,7 @@ _SPS_get_platform_linux_shorten() {
 }
 
 _SPS_get_platform_other() {
-	if [ -n "$TERMUX_VERSION" ]; then
+	if [ -n "${TERMUX_VERSION:-}" ]; then
 		_sps_platform='termux'
 	elif _SPS_is_windows; then
 		_sps_platform='windows'
@@ -238,7 +239,7 @@ _SPS_get_platform_other() {
 _SPS_set_sps_tmp() {
 	_SPS_TMPDIR="${XDG_RUNTIME_DIR:-${TMPDIR:-${TEMP:-${TMP:-/tmp}}}}/sh-prompt-simple/$$"
 
-	if [ "$_SPS_PLATFORM" = 'windows' ] && [ -z "$_SPS_TMPDIR" ]; then
+	if [ -z "$_SPS_TMPDIR" ] && [ "$_SPS_PLATFORM" = 'windows' ]; then
 		# shellcheck disable=1003
 		_SPS_TMPDIR="$(printf '%s' "$USERPROFILE/AppData/Local/Temp/sh-prompt-simple/$$" | tr '\\' '/')"
 	fi
@@ -289,7 +290,7 @@ _SPS_set_ps1() {
 		fi
 	else
 		# ZSH does not support Zero-Width Escapes
-		[ -n "$ZSH_VERSION" ] && setopt PROMPT_SUBST
+		[ -n "${ZSH_VERSION:-}" ] && setopt PROMPT_SUBST
 
 		if command -v '__git_ps1' >/dev/null; then
 			_SPS_set_ps1_without_zw_escape_with_git_prompt
@@ -435,13 +436,13 @@ _SPS_last_exit_status_symbol() {
 ## = SPS_WINDOW_TITLE =
 
 _SPS_set_window_title() {
-	[ "$SPS_WINDOW_TITLE" = 0 ] && return 0
+	[ "${SPS_WINDOW_TITLE:-}" = 0 ] && return 0
 
 	printf '\033]0;%s\007' "$(_SPS_domain_or_localnet_host)"
 }
 
 _SPS_domain_or_localnet_host() {
-	[ -z "$_SPS_DOMAIN_OR_LOCALNET_HOST" ] \
+	[ -z "${_SPS_DOMAIN_OR_LOCALNET_HOST:-}" ] \
 		&& _SPS_DOMAIN_OR_LOCALNET_HOST="$(_SPS_get_domain_or_localnet_host)"
 
 	printf '%s' "$_SPS_DOMAIN_OR_LOCALNET_HOST"
@@ -617,7 +618,7 @@ _SPS_git_close_bracket() {
 
 # called by `trap` when shell session is exited
 _SPS_cleanup() {
-	rm -rf "$_SPS_TMP"
+	rm -rf "$_SPS_TMPDIR"
 }
 
 # trap when shell session is exited
