@@ -6,7 +6,7 @@
 # * `## = Subsection =`
 #
 # run the following to view the script structure:
-# grep -E '# =|() {$' prompt.sh | grep -i --color '[A-Za-z0-9]'
+#   grep -E '# =|() {$' prompt.sh | grep -i --color '[A-Za-z0-9]'
 
 # STYLE GUIDE
 #    SPS_SCREAMING_SNAKE_CASE - user config environment variables (constants)
@@ -617,7 +617,7 @@ _SPS_git_close_bracket() {
 
 # called by `trap` when shell session is exited
 _SPS_cleanup() {
-	rm -rf "$_SPS_TMP"
+	rm -rf "$_SPS_TMPDIR"
 }
 
 # trap when shell session is exited
